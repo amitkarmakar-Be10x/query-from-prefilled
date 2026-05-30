@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Prefill Link Forge — Zoom → WATI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0b0f;
+    --surface:#121419;
+    --surface-2:#171a21;
+    --surface-3:#1e222b;
+    --line:rgba(255,255,255,.075);
+    --line-2:rgba(255,255,255,.13);
+    --text:#eef0f3;
+    --muted:#8b909c;
+    --muted-2:#5e636e;
+    --accent:#ff8a4c;
+    --accent-soft:rgba(255,138,76,.14);
+    --accent-line:rgba(255,138,76,.5);
+    --teal:#3dd7b0;
+    --teal-soft:rgba(61,215,176,.13);
+    --danger:#ff6b6b;
+    --radius:16px;
+    --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --display:"Bricolage Grotesque",sans-serif;
+    --body:"Instrument Sans",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--body);
+    font-size:15px;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    overflow-x:hidden;
+    position:relative;
+  }
+
+  /* ---------- atmosphere ---------- */
+  .aurora{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .blob{position:absolute;border-radius:50%;filter:blur(90px);opacity:.5;mix-blend-mode:screen}
+  .blob.b1{width:46vw;height:46vw;background:radial-gradient(circle,#ff8a4c 0%,transparent 65%);top:-14vw;left:-8vw;animation:drift1 26s ease-in-out infinite}
+  .blob.b2{width:40vw;height:40vw;background:radial-gradient(circle,#3dd7b0 0%,transparent 65%);bottom:-16vw;right:-10vw;opacity:.32;animation:drift2 32s ease-in-out infinite}
+  .blob.b3{width:30vw;height:30vw;background:radial-gradient(circle,#7a5cff 0%,transparent 65%);top:40%;left:55%;opacity:.18;animation:drift3 38s ease-in-out infinite}
+  @keyframes drift1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(6vw,8vh) scale(1.12)}}
+  @keyframes drift2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-7vw,-6vh) scale(1.15)}}
+  @keyframes drift3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-5vw,5vh) scale(.9)}}
+  .grain{position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.04;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+  /* ---------- layout ---------- */
+  .wrap{position:relative;z-index:2;max-width:1080px;margin:0 auto;padding:48px 24px 90px}
+
+  /* ---------- reveal ---------- */
+  .reveal{opacity:0;transform:translateY(16px);animation:rise .7s cubic-bezier(.22,.61,.36,1) forwards}
+  @keyframes rise{to{opacity:1;transform:none}}
+
+  /* ---------- header ---------- */
+  header{margin-bottom:30px}
+  .badge{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--teal);background:var(--teal-soft);border:1px solid rgba(61,215,176,.28);padding:6px 12px;border-radius:999px}
+  .badge .dot{width:6px;height:6px;border-radius:50%;background:var(--teal);box-shadow:0 0 10px var(--teal);animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  h1{font-family:var(--display);font-weight:800;font-size:clamp(34px,5.4vw,56px);line-height:1.02;letter-spacing:-.02em;margin:18px 0 8px}
+  h1 .ink{color:var(--accent)}
+  .sub{color:var(--muted);font-size:16px;max-width:620px}
+  .sub b{color:var(--text);font-weight:600}
+
+  /* ---------- cards ---------- */
+  .card{background:linear-gradient(180deg,var(--surface) 0%,var(--surface-2) 100%);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+  .card + .card{margin-top:18px}
+
+  /* ---------- config ---------- */
+  details.config{margin-top:26px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  details.config>summary{list-style:none;cursor:pointer;padding:16px 20px;display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:13px;letter-spacing:.02em;color:var(--text);user-select:none}
+  details.config>summary::-webkit-details-marker{display:none}
+  .chev{margin-left:auto;transition:transform .3s ease;color:var(--muted)}
+  details.config[open] .chev{transform:rotate(90deg)}
+  .cfg-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--accent-soft);color:var(--accent);font-size:15px}
+  .cfg-body{padding:6px 20px 22px;border-top:1px solid var(--line)}
+  .cfg-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 18px;margin-top:16px}
+  @media(max-width:640px){.cfg-grid{grid-template-columns:1fr}}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field.full{grid-column:1/-1}
+  label.lbl{font-size:12px;color:var(--muted);font-weight:500;letter-spacing:.01em}
+  label.lbl .tag{font-family:var(--mono);color:var(--accent);font-size:11px}
+  input.in,select.in{font-family:var(--mono);font-size:13px;color:var(--text);background:var(--surface-3);border:1px solid var(--line-2);border-radius:10px;padding:11px 13px;outline:none;transition:border-color .2s,box-shadow .2s;width:100%}
+  input.in:focus,select.in:focus{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft)}
+  select.in{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238b909c'%3E%3Cpath d='M6 8 1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center}
+  .toggle-row{display:flex;align-items:center;gap:12px;padding:4px 0}
+  .switch{position:relative;width:42px;height:24px;flex:none}
+  .switch input{opacity:0;width:0;height:0;position:absolute}
+  .slider{position:absolute;inset:0;background:var(--surface-3);border:1px solid var(--line-2);border-radius:999px;transition:.25s;cursor:pointer}
+  .slider:before{content:"";position:absolute;height:16px;width:16px;left:3px;top:3px;background:var(--muted);border-radius:50%;transition:.25s}
+  .switch input:checked + .slider{background:var(--accent-soft);border-color:var(--accent-line)}
+  .switch input:checked + .slider:before{transform:translateX(18px);background:var(--accent)}
+  .toggle-row .t-txt{font-size:13px;color:var(--text)}
+  .toggle-row .t-sub{font-size:11.5px;color:var(--muted)}
+
+  /* ---------- tabs / input ---------- */
+  .tabs{display:inline-flex;gap:4px;background:var(--surface-3);border:1px solid var(--line);border-radius:11px;padding:4px;margin-bottom:16px}
+  .tab{font-family:var(--mono);font-size:12.5px;letter-spacing:.02em;color:var(--muted);background:transparent;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;transition:.2s}
+  .tab.active{background:var(--accent);color:#1a0d04;font-weight:600}
+  .pane{display:none}
+  .pane.active{display:block;animation:fade .35s ease}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+
+  .drop{border:1.5px dashed var(--line-2);border-radius:14px;padding:46px 24px;text-align:center;cursor:pointer;transition:.25s;background:radial-gradient(120% 120% at 50% 0%,rgba(255,138,76,.05),transparent 60%)}
+  .drop:hover{border-color:var(--accent-line);background:radial-gradient(120% 120% at 50% 0%,rgba(255,138,76,.1),transparent 60%)}
+  .drop.over{border-color:var(--accent);background:rgba(255,138,76,.09);transform:scale(1.008)}
+  .drop .ic{font-size:34px;margin-bottom:10px;display:inline-block;animation:bob 3s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+  .drop .big{font-family:var(--display);font-weight:700;font-size:19px;margin-bottom:4px}
+  .drop .small{color:var(--muted);font-size:13px}
+  .drop .file-types{font-family:var(--mono);font-size:11px;color:var(--muted-2);margin-top:12px;letter-spacing:.04em}
+  textarea.paste{width:100%;min-height:180px;font-family:var(--mono);font-size:12.5px;line-height:1.6;color:var(--text);background:var(--surface-3);border:1px solid var(--line-2);border-radius:12px;padding:14px;outline:none;resize:vertical}
+  textarea.paste:focus{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft)}
+  .paste-actions{display:flex;gap:10px;margin-top:12px}
+
+  /* ---------- buttons ---------- */
+  .btn{font-family:var(--body);font-weight:600;font-size:14px;border:none;border-radius:11px;padding:12px 20px;cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:9px;white-space:nowrap}
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:var(--accent);color:#190c03;box-shadow:0 6px 22px -8px var(--accent)}
+  .btn-primary:hover{box-shadow:0 10px 30px -8px var(--accent);transform:translateY(-1px)}
+  .btn-ghost{background:var(--surface-3);color:var(--text);border:1px solid var(--line-2)}
+  .btn-ghost:hover{border-color:var(--accent-line);color:var(--accent)}
+  .btn-teal{background:var(--teal);color:#04231b;box-shadow:0 6px 22px -8px var(--teal)}
+  .btn-teal:hover{transform:translateY(-1px);box-shadow:0 10px 30px -8px var(--teal)}
+  .btn[disabled]{opacity:.4;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+
+  /* ---------- how it works ---------- */
+  .how{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}
+  @media(max-width:640px){.how{grid-template-columns:1fr}}
+  .step{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:16px}
+  .step .n{font-family:var(--mono);font-size:12px;color:var(--accent);background:var(--accent-soft);width:26px;height:26px;border-radius:8px;display:grid;place-items:center;margin-bottom:10px}
+  .step .st{font-weight:600;font-size:14px;margin-bottom:3px}
+  .step .sd{font-size:12.5px;color:var(--muted);line-height:1.45}
+
+  /* ---------- results ---------- */
+  #results{display:none;margin-top:30px}
+  #results.show{display:block;animation:rise .6s cubic-bezier(.22,.61,.36,1) both}
+  .meta{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-bottom:18px}
+  .meta .topic{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:-.01em}
+  .meta .pill{font-family:var(--mono);font-size:11.5px;color:var(--muted);background:var(--surface-3);border:1px solid var(--line);border-radius:999px;padding:5px 11px}
+  .meta .pill b{color:var(--text)}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+  @media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:16px 18px;position:relative;overflow:hidden}
+  .stat:after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+  .stat.teal:after{background:var(--teal)}
+  .stat.dim:after{background:var(--muted-2)}
+  .stat .v{font-family:var(--display);font-weight:800;font-size:30px;line-height:1;letter-spacing:-.02em}
+  .stat .k{font-size:12px;color:var(--muted);margin-top:6px;letter-spacing:.01em}
+
+  .toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+  .search{flex:1;min-width:200px;position:relative}
+  .search input{width:100%;font-family:var(--mono);font-size:13px;color:var(--text);background:var(--surface-3);border:1px solid var(--line-2);border-radius:10px;padding:10px 12px 10px 34px;outline:none}
+  .search input:focus{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft)}
+  .search .si{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px}
+
+  .tbl-wrap{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface)}
+  .tbl-scroll{max-height:560px;overflow:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{position:sticky;top:0;background:var(--surface-2);text-align:left;font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:500;padding:12px 14px;border-bottom:1px solid var(--line);z-index:1}
+  tbody td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:rgba(255,255,255,.02)}
+  td.nm{font-weight:600;white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis}
+  td.em{font-family:var(--mono);font-size:12px;color:var(--muted);white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+  td.ph{font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+  td.lk{font-family:var(--mono);font-size:11.5px;color:var(--teal);max-width:280px}
+  td.lk .lktxt{display:inline-block;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+  .mini{background:var(--surface-3);border:1px solid var(--line-2);color:var(--muted);border-radius:7px;padding:4px 7px;font-size:11px;cursor:pointer;margin-left:6px;transition:.18s;font-family:var(--mono)}
+  .mini:hover{color:var(--accent);border-color:var(--accent-line)}
+  .tbl-foot{padding:11px 14px;font-size:12px;color:var(--muted);background:var(--surface-2);border-top:1px solid var(--line);text-align:center}
+
+  .note{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.5;display:flex;gap:8px}
+  .note .nic{color:var(--accent);flex:none}
+
+  /* ---------- error ---------- */
+  .err{display:none;margin-top:16px;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.3);color:#ffb3b3;border-radius:12px;padding:14px 16px;font-size:13px}
+  .err.show{display:block;animation:fade .3s ease}
+
+  /* ---------- toast ---------- */
+  .toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--surface-2);border:1px solid var(--line-2);color:var(--text);padding:12px 20px;border-radius:12px;font-size:13.5px;font-weight:500;box-shadow:0 14px 40px -12px rgba(0,0,0,.7);opacity:0;pointer-events:none;transition:.3s;z-index:99;display:flex;align-items:center;gap:9px}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast .tk{color:var(--teal)}
+
+  footer{margin-top:40px;text-align:center;font-family:var(--mono);font-size:11.5px;color:var(--muted-2);letter-spacing:.03em}
+
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:6px}
+  ::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+<div class="aurora"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+<div class="grain"></div>
+
+<div class="wrap">
+
+  <header class="reveal" style="animation-delay:.02s">
+    <span class="badge"><span class="dot"></span>100% in your browser · no API key · nothing uploaded</span>
+    <h1>Prefill Link <span class="ink">Forge</span></h1>
+    <p class="sub">Drop a <b>Zoom registration report</b> and instantly get a WATI-ready CSV with <b>pre-filled Google Form links</b> for every registrant — name, email and phone baked into each URL.</p>
+  </header>
+
+  <!-- CONFIG -->
+  <details class="config reveal" style="animation-delay:.08s">
+    <summary>
+      <span class="cfg-icon">⚙</span>
+      Form settings <span style="color:var(--muted)">— pre-filled for your AI Tools Workshop form</span>
+      <span class="chev">›</span>
+    </summary>
+    <div class="cfg-body">
+      <div class="cfg-grid">
+        <div class="field full">
+          <label class="lbl">Google Form prefill base URL <span class="tag">(…viewform?usp=pp_url)</span></label>
+          <input class="in" id="cfgBase" value="https://docs.google.com/forms/d/e/1FAIpQLScgrvfcTrusgjPtss-kEbplcI3T1Apx2IBJY8IRjLHIzJ--1g/viewform?usp=pp_url">
+        </div>
+        <div class="field">
+          <label class="lbl">Name field <span class="tag">entry id</span></label>
+          <input class="in" id="cfgName" value="entry.1392621039">
+        </div>
+        <div class="field">
+          <label class="lbl">Email field <span class="tag">entry id</span></label>
+          <input class="in" id="cfgEmail" value="entry.942143804">
+        </div>
+        <div class="field">
+          <label class="lbl">Phone field <span class="tag">entry id</span></label>
+          <input class="in" id="cfgPhone" value="entry.1628146158">
+        </div>
+        <div class="field">
+          <label class="lbl">Country code <span class="tag">CSV column</span></label>
+          <input class="in" id="cfgCC" value="91">
+        </div>
+        <div class="field">
+          <label class="lbl">Name in link uses</label>
+          <select class="in" id="cfgNameMode">
+            <option value="first" selected>First name only (matches your existing report)</option>
+            <option value="full">Full name (First + Last)</option>
+          </select>
+        </div>
+        <div class="field" style="justify-content:flex-end">
+          <div class="toggle-row">
+            <label class="switch"><input type="checkbox" id="cfgEnc" checked><span class="slider"></span></label>
+            <div><div class="t-txt">URL-encode values</div><div class="t-sub">Safe for WhatsApp / WATI (recommended)</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </details>
+
+  <!-- INPUT -->
+  <div class="card reveal" style="animation-delay:.14s;margin-top:18px">
+    <div class="tabs">
+      <button class="tab active" data-pane="upload">⬆ Upload file</button>
+      <button class="tab" data-pane="paste">⌶ Paste CSV</button>
+    </div>
+
+    <div class="pane active" id="pane-upload">
+      <div class="drop" id="drop">
+        <input type="file" id="file" accept=".csv,text/csv" hidden>
+        <div class="ic">📄</div>
+        <div class="big">Drop your Zoom registration CSV here</div>
+        <div class="small">or click to browse</div>
+        <div class="file-types">registration_xxxxxxxxx.csv · exported from Zoom</div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-paste">
+      <textarea class="paste" id="pasteBox" placeholder="Paste the full contents of the Zoom registration report CSV here…&#10;(including the 'Attendee Details' section)"></textarea>
+      <div class="paste-actions">
+        <button class="btn btn-primary" id="pasteBtn">⚡ Generate links</button>
+        <button class="btn btn-ghost" id="pasteClear">Clear</button>
+      </div>
+    </div>
+
+    <div class="err" id="err"></div>
+
+    <div class="how">
+      <div class="step"><div class="n">1</div><div class="st">Upload the report</div><div class="sd">Use the file Zoom gives you under Registration → Export. We auto-detect the attendee table.</div></div>
+      <div class="step"><div class="n">2</div><div class="st">We map the fields</div><div class="sd">First name, email and phone are read, phone is cleaned to 10 digits, and folded into each form link.</div></div>
+      <div class="step"><div class="n">3</div><div class="st">Download the CSV</div><div class="sd">Get a ready-to-import WATI file: Name, CountryCode, Phone, AllowBroadcast, AllowSMS, formlink.</div></div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results">
+    <div class="meta" id="meta"></div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="toolbar">
+      <div class="search"><span class="si">⌕</span><input id="filter" placeholder="Filter by name, email or phone…"></div>
+      <button class="btn btn-primary" id="dlWati">⬇ Download WATI CSV</button>
+      <button class="btn btn-teal" id="dlLinks">⬇ Links only</button>
+      <button class="btn btn-ghost" id="copyAll">⧉ Copy all links</button>
+    </div>
+
+    <div class="tbl-wrap">
+      <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Prefilled form link</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="tbl-foot" id="tblFoot"></div>
+    </div>
+
+    <div class="note"><span class="nic">ℹ</span><span><b style="color:var(--text)">Opening in Excel?</b> The Phone column is plain text so WATI imports it correctly. If Excel shows something like <span style="font-family:var(--mono)">9.3E+09</span>, that's just Excel's display — the actual file data is the full number.</span></div>
+  </div>
+
+  <footer>built for House of EdTech · zoom → google form prefill → wati</footer>
+</div>
+
+<div class="toast" id="toast"><span class="tk">✓</span><span id="toastMsg">Copied</span></div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- elements ----------
+  const $ = s => document.querySelector(s);
+  const drop = $('#drop'), fileInput = $('#file');
+  const pasteBox = $('#pasteBox'), pasteBtn = $('#pasteBtn'), pasteClear = $('#pasteClear');
+  const errBox = $('#err');
+  const results = $('#results'), metaEl = $('#meta'), statsEl = $('#stats');
+  const tbody = $('#tbody'), tblFoot = $('#tblFoot'), filterInput = $('#filter');
+  const toast = $('#toast'), toastMsg = $('#toastMsg');
+  const PREVIEW_LIMIT = 150;
+
+  let RECORDS = [];   // {name, email, phone, link}
+  let META = null;
+
+  // ---------- tabs ----------
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.addEventListener('click',()=>{
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+      document.querySelectorAll('.pane').forEach(x=>x.classList.remove('active'));
+      t.classList.add('active');
+      $('#pane-'+t.dataset.pane).classList.add('active');
+    });
+  });
+
+  // ---------- config readers ----------
+  function cfg(){
+    return {
+      base: $('#cfgBase').value.trim(),
+      name: $('#cfgName').value.trim(),
+      email: $('#cfgEmail').value.trim(),
+      phone: $('#cfgPhone').value.trim(),
+      cc: $('#cfgCC').value.trim(),
+      nameMode: $('#cfgNameMode').value,
+      enc: $('#cfgEnc').checked
+    };
+  }
+
+  // ---------- helpers ----------
+  function showError(msg){ errBox.textContent = '⚠ ' + msg; errBox.classList.add('show'); }
+  function clearError(){ errBox.classList.remove('show'); errBox.textContent=''; }
+
+  function showToast(msg){
+    toastMsg.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(()=>toast.classList.remove('show'), 1900);
+  }
+
+  // phone: digits only -> last 10 -> strip leading zeros  (validated vs your Form_Report)
+  function normPhone(raw){
+    let d = String(raw==null?'':raw).replace(/\D/g,'');
+    if (d.length > 10) d = d.slice(-10);
+    d = d.replace(/^0+/, '');
+    return d;
+  }
+
+  function enc(v, on){ return on ? encodeURIComponent(v) : String(v); }
+
+  function buildLink(c, name, email, phone){
+    const sep = c.base.includes('?') ? '&' : '?';
+    let url = c.base;
+    let first = true;
+    function add(key, val){
+      if(!key || val==='' || val==null) return;
+      url += (first ? sep : '&') + key + '=' + enc(val, c.enc);
+      first = false;
+    }
+    add(c.name, name);
+    add(c.email, email);
+    add(c.phone, phone);
+    return url;
+  }
+
+  // ---------- CSV parsing (robust to Zoom's metadata header) ----------
+  function parseReport(text){
+    const res = Papa.parse(text, {skipEmptyLines:'greedy'});
+    const rows = res.data;
+    if(!rows || !rows.length) throw new Error('That file looks empty.');
+
+    // pull workshop meta if present
+    let meta = null;
+    for(let i=0;i<rows.length-1;i++){
+      const h = (rows[i]||[]).map(c=>String(c||'').trim().toLowerCase());
+      if(h.includes('topic') && h.includes('id')){
+        const hdr = rows[i].map(c=>String(c||'').trim().toLowerCase());
+        const v = rows[i+1] || [];
+        const get = (label)=>{ const idx=hdr.findIndex(x=>x.includes(label)); return idx>=0 ? String(v[idx]||'').trim() : ''; };
+        meta = {
+          topic: get('topic'),
+          scheduled: get('scheduled'),
+          registrants: get('# registrants') || get('registrants')
+        };
+        break;
+      }
+    }
+
+    // find the attendee header row
+    let headerIdx = -1;
+    // (a) explicit "Attendee Details" marker -> header is next row
+    for(let i=0;i<rows.length;i++){
+      if(String((rows[i]||[])[0]||'').trim().toLowerCase()==='attendee details'){ headerIdx = i+1; break; }
+    }
+    // (b) otherwise: first row containing an email-ish header
+    if(headerIdx<0){
+      for(let i=0;i<rows.length;i++){
+        const cells = (rows[i]||[]).map(c=>String(c||'').trim().toLowerCase());
+        if(cells.some(c=>c==='email'||c.includes('email')) &&
+           cells.some(c=>c.includes('name')||c.includes('phone')||c.includes('mobile'))){
+          headerIdx = i; break;
+        }
+      }
+    }
+    if(headerIdx<0 || !rows[headerIdx]) throw new Error('Could not find the attendee table. Make sure this is a Zoom registration report (it should contain an "Email" column).');
+
+    const header = rows[headerIdx].map(c=>String(c||'').trim().toLowerCase());
+    const findCol = (...tests)=>{
+      for(const test of tests){
+        const idx = header.findIndex(h => test instanceof RegExp ? test.test(h) : h===test);
+        if(idx>=0) return idx;
+      }
+      return -1;
+    };
+    const iFirst = findCol(/^first\s*name$/, /first/);
+    const iLast  = findCol(/^last\s*name$/, /last/);
+    const iName  = iFirst<0 ? findCol(/^name$/, /full name/, /attendee/) : -1;
+    const iEmail = findCol(/^email$/, /e-?mail/);
+    const iPhone = findCol(/^phone$/, /phone/, /mobile/, /contact/);
+
+    if(iEmail<0 && iPhone<0)
+      throw new Error('No Email or Phone column found in the attendee table.');
+
+    const c = cfg();
+    if(!c.base){ throw new Error('Form base URL is empty — open Form settings and paste your Google Form prefill link.'); }
+
+    const out = [];
+    const seenKey = new Set();
+    for(let r=headerIdx+1; r<rows.length; r++){
+      const row = rows[r] || [];
+      // stop / skip if a new section header appears
+      const firstCell = String(row[0]||'').trim().toLowerCase();
+      if(firstCell==='attendee details' || firstCell==='registration report') continue;
+
+      const firstName = iFirst>=0 ? String(row[iFirst]||'').trim() : (iName>=0 ? String(row[iName]||'').trim() : '');
+      const lastName  = iLast>=0  ? String(row[iLast]||'').trim()  : '';
+      const email     = iEmail>=0 ? String(row[iEmail]||'').trim() : '';
+      const phoneRaw  = iPhone>=0 ? String(row[iPhone]||'').trim() : '';
+
+      // skip empty / junk rows
+      if(!email && !phoneRaw && !firstName) continue;
+
+      // build display name
+      let name;
+      if(c.nameMode==='full'){
+        name = (firstName + ' ' + lastName).trim().replace(/\s+/g,' ');
+      } else {
+        name = firstName; // first-name-only matches your existing export
+      }
+
+      const phone = normPhone(phoneRaw);
+      const link  = buildLink(c, name, email, phone);
+
+      out.push({ name, email, phone, link });
+    }
+
+    if(!out.length) throw new Error('Found the table but no registrant rows in it.');
+    return { records: out, meta };
+  }
+
+  // ---------- rendering ----------
+  function animateCount(el, target){
+    const dur = 700, start = performance.now();
+    function frame(now){
+      const p = Math.min(1, (now-start)/dur);
+      const eased = 1 - Math.pow(1-p, 3);
+      el.textContent = Math.round(eased*target).toLocaleString();
+      if(p<1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function renderMeta(){
+    metaEl.innerHTML = '';
+    if(META && (META.topic||META.scheduled)){
+      const parts = [];
+      if(META.topic) parts.push(`<span class="topic">${escapeHtml(META.topic)}</span>`);
+      if(META.scheduled) parts.push(`<span class="pill">🗓 <b>${escapeHtml(META.scheduled)}</b></span>`);
+      if(META.registrants) parts.push(`<span class="pill">registrants in report <b>${escapeHtml(META.registrants)}</b></span>`);
+      metaEl.innerHTML = parts.join('');
+    }
+  }
+
+  function renderStats(){
+    const total = RECORDS.length;
+    const withEmail = RECORDS.filter(r=>r.email).length;
+    const withPhone = RECORDS.filter(r=>r.phone && r.phone.length>=10).length;
+    const missing = RECORDS.filter(r=>!r.phone || r.phone.length<10).length;
+    statsEl.innerHTML = `
+      <div class="stat"><div class="v" data-c="${total}">0</div><div class="k">links generated</div></div>
+      <div class="stat teal"><div class="v" data-c="${withEmail}">0</div><div class="k">with email</div></div>
+      <div class="stat teal"><div class="v" data-c="${withPhone}">0</div><div class="k">valid 10-digit phone</div></div>
+      <div class="stat dim"><div class="v" data-c="${missing}">0</div><div class="k">short / missing phone</div></div>`;
+    statsEl.querySelectorAll('.v').forEach(el=>animateCount(el, +el.dataset.c));
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  function renderTable(){
+    const q = filterInput.value.trim().toLowerCase();
+    const filtered = q ? RECORDS.filter(r =>
+      (r.name||'').toLowerCase().includes(q) ||
+      (r.email||'').toLowerCase().includes(q) ||
+      (r.phone||'').includes(q)) : RECORDS;
+
+    const slice = filtered.slice(0, PREVIEW_LIMIT);
+    tbody.innerHTML = slice.map((r,i)=>`
+      <tr>
+        <td class="nm" title="${escapeHtml(r.name)}">${escapeHtml(r.name)||'<span style="color:var(--muted-2)">—</span>'}</td>
+        <td class="em" title="${escapeHtml(r.email)}">${escapeHtml(r.email)||'—'}</td>
+        <td class="ph">${escapeHtml(r.phone)||'<span style="color:var(--danger)">—</span>'}</td>
+        <td class="lk">
+          <span class="lktxt" title="${escapeHtml(r.link)}">${escapeHtml(r.link)}</span>
+          <button class="mini" data-copy="${i}">copy</button>
+          <button class="mini" data-open="${i}">open</button>
+        </td>
+      </tr>`).join('');
+
+    // wire row buttons
+    tbody.querySelectorAll('[data-copy]').forEach(b=>{
+      b.addEventListener('click',()=>{ copyText(slice[+b.dataset.copy].link); showToast('Link copied'); });
+    });
+    tbody.querySelectorAll('[data-open]').forEach(b=>{
+      b.addEventListener('click',()=>window.open(slice[+b.dataset.open].link,'_blank'));
+    });
+
+    const shown = slice.length, totalF = filtered.length;
+    tblFoot.textContent = q
+      ? `Showing ${shown.toLocaleString()} of ${totalF.toLocaleString()} matching (${RECORDS.length.toLocaleString()} total)`
+      : (RECORDS.length>PREVIEW_LIMIT
+          ? `Preview: first ${shown.toLocaleString()} of ${RECORDS.length.toLocaleString()} — the download contains all ${RECORDS.length.toLocaleString()}`
+          : `${shown.toLocaleString()} rows`);
+  }
+
+  filterInput && filterInput.addEventListener('input', renderTable);
+
+  // ---------- copy / download ----------
+  function copyText(t){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(t).catch(()=>fallbackCopy(t));
+    } else fallbackCopy(t);
+  }
+  function fallbackCopy(t){
+    const ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try{document.execCommand('copy');}catch(e){}
+    document.body.removeChild(ta);
+  }
+
+  function csvField(v){
+    v = (v==null?'':String(v));
+    return /[",\r\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+  }
+
+  function fileStub(){
+    let s = (META && META.topic) ? META.topic : 'prefill_links';
+    s = s.replace(/[^\w\s-]/g,'').trim().replace(/\s+/g,'_').slice(0,50);
+    return s || 'prefill_links';
+  }
+
+  function downloadCsv(text, filename){
+    const blob = new Blob(['\ufeff'+text], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  }
+
+  $('#dlWati').addEventListener('click',()=>{
+    const c = cfg();
+    const head = 'Name,CountryCode,Phone,AllowBroadcast,AllowSMS,formlink';
+    const lines = RECORDS.map(r =>
+      [ csvField(''), csvField(c.cc), csvField(r.phone), csvField('TRUE'), csvField('TRUE'), csvField(r.link) ].join(',')
+    );
+    downloadCsv([head, ...lines].join('\r\n'), 'WATI_'+fileStub()+'.csv');
+    showToast('WATI CSV downloaded ('+RECORDS.length.toLocaleString()+' rows)');
+  });
+
+  $('#dlLinks').addEventListener('click',()=>{
+    const head = 'Name,Email,Phone,formlink';
+    const lines = RECORDS.map(r =>
+      [ csvField(r.name), csvField(r.email), csvField(r.phone), csvField(r.link) ].join(',')
+    );
+    downloadCsv([head, ...lines].join('\r\n'), 'Links_'+fileStub()+'.csv');
+    showToast('Links CSV downloaded');
+  });
+
+  $('#copyAll').addEventListener('click',()=>{
+    copyText(RECORDS.map(r=>r.link).join('\n'));
+    showToast('All '+RECORDS.length.toLocaleString()+' links copied');
+  });
+
+  // ---------- run ----------
+  function run(text){
+    clearError();
+    try{
+      const { records, meta } = parseReport(text);
+      RECORDS = records; META = meta;
+      renderMeta(); renderStats(); renderTable();
+      results.classList.add('show');
+      results.scrollIntoView({behavior:'smooth', block:'start'});
+    }catch(e){
+      results.classList.remove('show');
+      showError(e.message || 'Something went wrong parsing the file.');
+    }
+  }
+
+  function handleFile(file){
+    if(!file) return;
+    if(!/\.csv$/i.test(file.name) && file.type!=='text/csv'){
+      showError('Please use a .csv file exported from Zoom.'); return;
+    }
+    file.text().then(run).catch(()=>{
+      const fr = new FileReader();
+      fr.onload = e => run(e.target.result);
+      fr.onerror = () => showError('Could not read that file.');
+      fr.readAsText(file);
+    });
+  }
+
+  // file input + dropzone
+  drop.addEventListener('click',()=>fileInput.click());
+  fileInput.addEventListener('change', e=>handleFile(e.target.files[0]));
+  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+  drop.addEventListener('drop',e=>{ if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]); });
+
+  // paste
+  pasteBtn.addEventListener('click',()=>{
+    const t = pasteBox.value.trim();
+    if(!t){ showError('Paste the CSV contents first.'); return; }
+    run(t);
+  });
+  pasteClear.addEventListener('click',()=>{ pasteBox.value=''; clearError(); });
+
+})();
+</script>
+</body>
+</html>
